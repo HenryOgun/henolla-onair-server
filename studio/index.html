@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Henolla OnAir — Studio Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+:root {
+  --bg:    #04080f;
+  --bg2:   #080f1c;
+  --bg3:   #0c1829;
+  --bg4:   #101e34;
+  --border:#162035;
+  --gold:  #f4b942;
+  --gold2: #ffcd60;
+  --txt:   #dce8f8;
+  --txt2:  #5a7393;
+  --txt3:  #3a5068;
+  --red:   #ff3b3b;
+  --red2:  #ff6b6b;
+  --green: #00e87a;
+  --green2:#00c96a;
+  --amber: #ffaa00;
+  --blue:  #4f9eff;
+  --r:     14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:15px}
+body{background:var(--bg);color:var(--txt);font-family:'Plus Jakarta Sans',system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
+
+/* ═══ HEADER ═══════════════════════════════════════════════════════════════ */
+.hdr{
+  position:sticky;top:0;z-index:100;
+  background:rgba(4,8,15,.92);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  height:64px;
+  display:flex;align-items:center;
+  padding:0 24px;gap:20px;
+}
+.logo-mark{
+  display:flex;align-items:center;gap:10px;
+}
+.logo-dot{
+  width:10px;height:10px;border-radius:50%;
+  background:var(--red);
+  box-shadow:0 0 12px var(--red);
+  animation:blink 1.4s ease-in-out infinite;
+}
+.logo-dot.idle{background:var(--txt3);box-shadow:none;animation:none;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+.logo-text{font-size:1.05rem;font-weight:800;letter-spacing:-.3px;color:var(--txt)}
+.logo-text span{color:var(--gold)}
+
+.hdr-clock{
+  font-family:'JetBrains Mono',monospace;font-size:.95rem;font-weight:700;
+  color:var(--txt2);letter-spacing:1px;
+}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+.code-pill{
+  background:var(--bg3);border:1px solid var(--border);border-radius:10px;
+  padding:6px 14px;display:flex;align-items:center;gap:10px;
+}
+.code-pill-label{font-size:.65rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--txt3);font-weight:700}
+.code-pill-val{
+  font-family:'JetBrains Mono',monospace;font-size:1.35rem;font-weight:700;
+  letter-spacing:5px;color:var(--gold);
+}
+
+.btn{cursor:pointer;border:none;border-radius:9px;padding:9px 18px;font-weight:700;font-size:.82rem;font-family:inherit;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{filter:brightness(1.1)}
+.btn:active{transform:scale(.97)}
+.btn-gold{background:var(--gold);color:#04080f}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--txt2)}
+.btn-ghost:hover{border-color:var(--txt3);color:var(--txt)}
+.btn-wa{background:#25d366;color:#fff}
+.btn-danger{background:rgba(255,59,59,.12);border:1px solid rgba(255,59,59,.25);color:var(--red)}
+.btn-danger:hover{background:rgba(255,59,59,.2)}
+.btn-sm{padding:7px 14px;font-size:.78rem;border-radius:8px}
+
+.on-air-badge{
+  background:var(--red);color:#fff;font-size:.7rem;font-weight:800;letter-spacing:2px;
+  padding:5px 13px;border-radius:6px;display:none;
+  animation:blink .9s step-end infinite;
+}
+
+/* ═══ SETUP SCREEN ══════════════════════════════════════════════════════════ */
+#setup-screen{
+  min-height:calc(100vh - 64px);
+  display:flex;align-items:center;justify-content:center;
+  padding:40px 20px;
+}
+.setup-wrap{width:100%;max-width:460px}
+.setup-hero{text-align:center;margin-bottom:36px}
+.setup-hero h1{font-size:2.2rem;font-weight:900;letter-spacing:-1px;margin-bottom:8px}
+.setup-hero h1 em{font-style:normal;color:var(--gold)}
+.setup-hero p{color:var(--txt2);line-height:1.7;font-size:.92rem}
+
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r)}
+.setup-card{padding:30px}
+.field-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--txt3);margin-bottom:7px;display:block}
+.field-wrap{margin-bottom:18px}
+select,input{
+  width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;
+  color:var(--txt);padding:12px 14px;font-size:.92rem;font-family:inherit;outline:none;
+  transition:border-color .15s;appearance:none;-webkit-appearance:none;
+}
+select:focus,input:focus{border-color:var(--gold)}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%235a7393' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
+
+.meter-row{background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.meter-label{font-size:.75rem;color:var(--txt2);font-weight:600;white-space:nowrap}
+.meter-track{flex:1;height:6px;background:var(--bg4);border-radius:3px;overflow:hidden}
+.meter-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--green),var(--amber) 70%,var(--red));width:0%;transition:width .08s}
+
+.setup-btn{
+  width:100%;padding:16px;background:var(--gold);color:#04080f;
+  border:none;border-radius:10px;font-size:1rem;font-weight:800;
+  font-family:inherit;cursor:pointer;transition:all .15s;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.setup-btn:hover{background:var(--gold2)}
+.setup-btn:active{transform:scale(.98)}
+.setup-hint{margin-top:12px;font-size:.76rem;color:var(--txt3);text-align:center;line-height:1.6}
+
+/* ═══ CONSOLE SCREEN ════════════════════════════════════════════════════════ */
+#console-screen{display:none;padding:24px;max-width:1400px;margin:0 auto}
+
+.session-bar{
+  display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap;
+}
+.session-stat{
+  background:var(--bg2);border:1px solid var(--border);border-radius:9px;
+  padding:7px 14px;font-size:.8rem;display:flex;align-items:center;gap:6px;color:var(--txt2);
+}
+.session-stat b{color:var(--txt);font-weight:700}
+.session-elapsed{font-family:'JetBrains Mono',monospace;font-size:.88rem;font-weight:700;color:var(--gold)}
+
+/* ═══ GUEST GRID ════════════════════════════════════════════════════════════ */
+.guest-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(290px,1fr));
+  gap:16px;
+  margin-bottom:24px;
+}
+
+/* ── Empty state ── */
+.empty-state{
+  grid-column:1/-1;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:80px 20px;text-align:center;gap:16px;
+}
+.empty-ring{
+  width:100px;height:100px;border-radius:50%;
+  border:2px dashed var(--border);
+  display:flex;align-items:center;justify-content:center;
+  animation:spinSlow 8s linear infinite;
+}
+@keyframes spinSlow{to{transform:rotate(360deg)}}
+.empty-ring svg{animation:spinSlow 8s linear infinite reverse}
+.empty-state h3{font-size:1.05rem;font-weight:700;color:var(--txt)}
+.empty-state p{font-size:.85rem;color:var(--txt2);max-width:300px;line-height:1.6}
+.big-code{
+  font-family:'JetBrains Mono',monospace;font-size:2.8rem;font-weight:700;
+  letter-spacing:8px;color:var(--gold);
+  text-shadow:0 0 40px rgba(244,185,66,.25);
+}
+
+/* ── Guest Card ── */
+.guest-card{
+  background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);
+  padding:20px;display:flex;flex-direction:column;gap:14px;
+  transition:border-color .25s,box-shadow .25s;
+  position:relative;overflow:hidden;
+}
+.guest-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:transparent;transition:background .25s;
+}
+.guest-card.cued   {border-color:rgba(0,232,122,.3);box-shadow:0 0 28px rgba(0,232,122,.08)}
+.guest-card.cued::before{background:var(--green)}
+.guest-card.on-air {border-color:rgba(255,59,59,.4);box-shadow:0 0 36px rgba(255,59,59,.12)}
+.guest-card.on-air::before{background:var(--red);animation:blink .8s step-end infinite}
+.guest-card.hold   {border-color:rgba(255,170,0,.3);box-shadow:0 0 28px rgba(255,170,0,.07)}
+.guest-card.hold::before{background:var(--amber)}
+
+/* Avatar row */
+.card-avatar-row{display:flex;align-items:center;gap:12px}
+.avatar{
+  width:46px;height:46px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1rem;font-weight:800;color:#fff;flex-shrink:0;
+  position:relative;
+}
+.avatar-ring{
+  position:absolute;inset:-3px;border-radius:50%;
+  border:2px solid transparent;transition:all .25s;
+}
+.on-air .avatar-ring{border-color:var(--red);animation:ringpulse 1s ease-in-out infinite}
+.cued   .avatar-ring{border-color:var(--green)}
+.hold   .avatar-ring{border-color:var(--amber)}
+@keyframes ringpulse{0%,100%{box-shadow:0 0 0 0 rgba(255,59,59,.4)}50%{box-shadow:0 0 0 6px rgba(255,59,59,0)}}
+.card-identity{flex:1;min-width:0}
+.card-name{font-size:1rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-joined{font-size:.7rem;color:var(--txt3);margin-top:1px}
+
+.status-chip{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:.7rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  padding:3px 10px;border-radius:20px;
+}
+.chip-waiting{background:var(--bg3);color:var(--txt3)}
+.chip-cued   {background:rgba(0,232,122,.12);color:var(--green);border:1px solid rgba(0,232,122,.3)}
+.chip-on-air {background:rgba(255,59,59,.12);color:var(--red);border:1px solid rgba(255,59,59,.3);animation:blink .9s step-end infinite}
+.chip-hold   {background:rgba(255,170,0,.12);color:var(--amber);border:1px solid rgba(255,170,0,.3)}
+.chip-dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+
+/* Waveform canvas */
+.waveform-wrap{height:40px;border-radius:8px;overflow:hidden;background:var(--bg3)}
+.waveform-wrap canvas{width:100%;height:100%;display:block}
+
+/* On-air timer */
+.on-air-timer{
+  font-family:'JetBrains Mono',monospace;font-size:1.4rem;font-weight:700;
+  color:var(--red);text-align:center;display:none;
+  text-shadow:0 0 20px rgba(255,59,59,.4);
+  letter-spacing:2px;
+}
+
+/* Signal quality */
+.signal-row{display:flex;align-items:center;gap:6px}
+.signal-dots{display:flex;gap:3px}
+.sig-dot{width:6px;height:6px;border-radius:50%;background:var(--border);transition:background .3s}
+.sig-dot.lit{background:var(--green)}
+.sig-dot.warn{background:var(--amber)}
+.sig-dot.bad{background:var(--red)}
+.signal-label{font-size:.7rem;color:var(--txt3)}
+
+/* Control buttons */
+.ctrl-row{display:flex;gap:6px}
+.ctrl-btn{
+  flex:1;cursor:pointer;border:1px solid var(--border);border-radius:8px;
+  padding:9px 4px;font-size:.72rem;font-weight:700;letter-spacing:.5px;
+  text-transform:uppercase;background:var(--bg3);color:var(--txt3);
+  font-family:inherit;transition:all .15s;
+}
+.ctrl-btn:hover{transform:translateY(-1px)}
+.ctrl-btn:active{transform:scale(.95)}
+.ctrl-btn.cue    {border-color:rgba(0,232,122,.4);color:var(--green)}
+.ctrl-btn.cue:hover{background:rgba(0,232,122,.08)}
+.ctrl-btn.on-air {border-color:rgba(255,59,59,.4);color:var(--red)}
+.ctrl-btn.on-air:hover{background:rgba(255,59,59,.08)}
+.ctrl-btn.hold   {border-color:rgba(255,170,0,.4);color:var(--amber)}
+.ctrl-btn.hold:hover{background:rgba(255,170,0,.08)}
+.ctrl-btn.tb     {border-color:rgba(79,158,255,.4);color:var(--blue)}
+.ctrl-btn.tb:hover{background:rgba(79,158,255,.08)}
+.ctrl-btn.tb.active{background:rgba(79,158,255,.15);border-color:var(--blue)}
+.ctrl-btn.rm     {border-color:rgba(255,59,59,.2);color:var(--txt3)}
+.ctrl-btn.rm:hover{background:rgba(255,59,59,.06);color:var(--red);border-color:rgba(255,59,59,.3)}
+
+.tb-label{font-size:.68rem;color:var(--blue);font-weight:700;text-align:center;display:none}
+
+/* ═══ MESSAGES PANEL ════════════════════════════════════════════════════════ */
+.msg-panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:100px}
+.msg-panel-hdr{
+  padding:13px 18px;border-bottom:1px solid var(--border);
+  font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--txt3);
+  display:flex;align-items:center;gap:8px;
+}
+.msg-badge{background:var(--red);color:#fff;font-size:.65rem;padding:1px 7px;border-radius:10px;font-weight:700;display:none}
+.msg-list{padding:12px;max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.msg-item{background:var(--bg3);border-radius:9px;padding:10px 13px;border-left:2px solid var(--gold)}
+.msg-from{font-size:.7rem;font-weight:700;color:var(--gold);margin-bottom:3px}
+.msg-text{font-size:.88rem;line-height:1.5}
+.msg-time{font-size:.65rem;color:var(--txt3);margin-top:3px;font-family:'JetBrains Mono',monospace}
+.msg-empty{text-align:center;padding:20px;color:var(--txt3);font-size:.85rem}
+
+/* ═══ TOAST ═════════════════════════════════════════════════════════════════ */
+.toast{
+  position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+  background:var(--bg4);border:1px solid var(--border);
+  color:var(--txt);padding:11px 22px;border-radius:10px;
+  font-size:.85rem;font-weight:600;display:none;z-index:9999;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);
+  animation:slideUp .2s ease;
+}
+@keyframes slideUp{from{transform:translateX(-50%) translateY(10px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}
+
+/* ═══ STATUS BAR ════════════════════════════════════════════════════════════ */
+.status-bar{
+  position:fixed;bottom:0;left:0;right:0;
+  background:rgba(4,8,15,.9);backdrop-filter:blur(16px);
+  border-top:1px solid var(--border);
+  padding:8px 24px;display:flex;align-items:center;gap:12px;
+  font-size:.72rem;color:var(--txt3);
+}
+.status-bar-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+
+/* ═══ SCROLLBAR ════════════════════════════════════════════════════════════ */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="hdr">
+  <div class="logo-mark">
+    <div class="logo-dot idle" id="logo-dot"></div>
+    <div class="logo-text">Henolla <span>OnAir</span></div>
+  </div>
+  <div class="hdr-clock" id="hdr-clock">00:00:00</div>
+  <div class="hdr-right" id="hdr-right" style="display:none">
+    <div class="code-pill">
+      <div>
+        <div class="code-pill-label">Room Code</div>
+        <div class="code-pill-val" id="hdr-code">------</div>
+      </div>
+    </div>
+    <span class="session-elapsed" id="session-elapsed">00:00</span>
+    <div class="on-air-badge" id="on-air-badge">ON AIR</div>
+    <button class="btn btn-ghost btn-sm" onclick="copyCode()">Copy</button>
+    <button class="btn btn-wa btn-sm" onclick="shareWhatsApp()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/></svg>
+      Invite
+    </button>
+    <button class="btn btn-danger btn-sm" onclick="endSession()">End Session</button>
+  </div>
+</header>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen">
+  <div class="setup-wrap">
+    <div class="setup-hero">
+      <h1>Studio <em>Console</em></h1>
+      <p>Select your programme feed source, then create a room.<br>Share the code — guests join in seconds.</p>
+    </div>
+    <div class="card setup-card">
+      <div class="field-wrap">
+        <label class="field-label">Programme Feed / Audio Input</label>
+        <select id="audio-device-select"><option>Loading audio devices...</option></select>
+      </div>
+      <div class="meter-row">
+        <span class="meter-label">Input Level</span>
+        <div class="meter-track"><div class="meter-fill" id="setup-meter"></div></div>
+      </div>
+      <button class="setup-btn" onclick="createRoom()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/></svg>
+        Create Room &amp; Go Live
+      </button>
+      <p class="setup-hint">Your browser will ask for microphone permission — click Allow.</p>
+    </div>
+  </div>
+</div>
+
+<!-- CONSOLE SCREEN -->
+<div id="console-screen">
+  <div class="session-bar">
+    <div class="session-stat">Guests <b id="guest-count">0</b> / 6</div>
+    <div class="session-stat">Session <span class="session-elapsed" id="session-elapsed-2">00:00</span></div>
+    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="copyCode()">Copy Code</button>
+      <button class="btn btn-wa btn-sm" onclick="shareWhatsApp()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/></svg>
+        WhatsApp Invite
+      </button>
+    </div>
+  </div>
+
+  <div class="guest-grid" id="guest-grid">
+    <div class="empty-state">
+      <div class="empty-ring">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--txt3)" stroke-width="1.5" stroke-linecap="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      </div>
+      <h3>Waiting for guests</h3>
+      <div class="big-code" id="empty-code">------</div>
+      <p>Share the room code or send a WhatsApp invite. Guests can join from any browser.</p>
+    </div>
+  </div>
+
+  <div class="msg-panel">
+    <div class="msg-panel-hdr">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Messages from Guests
+      <span class="msg-badge" id="msg-badge">0</span>
+    </div>
+    <div class="msg-list" id="msg-list">
+      <div class="msg-empty">No messages yet.</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="status-bar">
+  <div class="status-bar-dot" id="status-dot" style="background:var(--txt3);box-shadow:none"></div>
+  <span id="status-txt">Not connected</span>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+const SERVER = window.location.origin;
+let socket = null, roomCode = null, localStream = null;
+let audioCtx = null, setupAnalyser = null;
+let peers = {}, guestGains = {}, guestAnalysers = {}, guestTimers = {}, tbActive = {}, guests = {};
+let sessionStart = null, sessionInterval = null, msgCount = 0;
+
+const AVATAR_COLORS = ['#e74c3c','#e67e22','#f39c12','#27ae60','#16a085','#2980b9','#8e44ad','#e91e63','#00bcd4','#ff5722'];
+const ICE = { iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}] };
+
+// ── Clock ─────────────────────────────────────────────────────────────────────
+setInterval(() => {
+  document.getElementById('hdr-clock').textContent = new Date().toLocaleTimeString('en-GB');
+}, 1000);
+
+// ── Session elapsed ───────────────────────────────────────────────────────────
+function startSessionTimer() {
+  sessionStart = Date.now();
+  sessionInterval = setInterval(() => {
+    const s = Math.floor((Date.now() - sessionStart) / 1000);
+    const t = `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+    document.getElementById('session-elapsed').textContent = t;
+    document.getElementById('session-elapsed-2').textContent = t;
+  }, 1000);
+}
+
+// ── Audio devices ─────────────────────────────────────────────────────────────
+async function loadDevices() {
+  try {
+    await navigator.mediaDevices.getUserMedia({audio:true});
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    const sel = document.getElementById('audio-device-select');
+    sel.innerHTML = '';
+    devs.filter(d=>d.kind==='audioinput').forEach((d,i)=>{
+      const o = document.createElement('option');
+      o.value = d.deviceId;
+      o.textContent = d.label || `Microphone ${i+1}`;
+      sel.appendChild(o);
+    });
+    sel.onchange = startSetupMeter;
+    startSetupMeter();
+  } catch(e) { status('Mic error: '+e.message); }
+}
+loadDevices();
+
+async function startSetupMeter() {
+  if (localStream) localStream.getTracks().forEach(t=>t.stop());
+  const sel = document.getElementById('audio-device-select');
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({
+      audio:{ deviceId: sel.value?{exact:sel.value}:undefined, echoCancellation:false, noiseSuppression:false }
+    });
+    if (!audioCtx) audioCtx = new AudioContext();
+    const src = audioCtx.createMediaStreamSource(localStream);
+    setupAnalyser = audioCtx.createAnalyser(); setupAnalyser.fftSize = 256;
+    src.connect(setupAnalyser);
+    const buf = new Uint8Array(setupAnalyser.frequencyBinCount);
+    const bar = document.getElementById('setup-meter');
+    (function tick(){
+      if (!setupAnalyser) return;
+      setupAnalyser.getByteFrequencyData(buf);
+      bar.style.width = Math.min(100, (buf.reduce((a,b)=>a+b,0)/buf.length)*1.8)+'%';
+      requestAnimationFrame(tick);
+    })();
+  } catch(e) { status('Mic error: '+e.message); }
+}
+
+// ── Create room ───────────────────────────────────────────────────────────────
+async function createRoom() {
+  try {
+    const r = await fetch(`${SERVER}/api/create-room`,{method:'POST'});
+    const d = await r.json(); roomCode = d.code;
+    ['hdr-code','empty-code'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=roomCode;});
+    document.getElementById('hdr-right').style.display='flex';
+    document.getElementById('setup-screen').style.display='none';
+    document.getElementById('console-screen').style.display='block';
+    document.getElementById('logo-dot').classList.remove('idle');
+    startSessionTimer();
+    connectSocket();
+    status('Room '+roomCode+' created — waiting for guests');
+  } catch(e) { toast('Cannot connect to server. Is it running on port 3400?'); }
+}
+
+// ── Socket ────────────────────────────────────────────────────────────────────
+function connectSocket() {
+  socket = io(SERVER,{transports:['websocket']});
+  socket.on('connect',()=>{ socket.emit('studio-join',{code:roomCode}); setConnected(true); });
+  socket.on('room-state',({guests:gs})=>gs.forEach(addCard));
+  socket.on('guest-joined',(g)=>{ guests[g.id]=g; addCard(g); toast(`${g.name} joined`); sendOffer(g.id); });
+  socket.on('guest-updated',(g)=>{ guests[g.id]=g; updateCard(g); checkOnAir(); });
+  socket.on('guest-left',({guestId})=>{ removeCard(guestId); delete guests[guestId]; checkOnAir(); });
+  socket.on('answer',({from,answer})=>{ const pc=peers[from]; if(pc) pc.setRemoteDescription(new RTCSessionDescription(answer)); });
+  socket.on('ice-candidate',({from,candidate})=>{ const pc=peers[from]; if(pc&&candidate) pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(()=>{}); });
+  socket.on('guest-message',({guestId,name,message,time})=>{ addMsg(name,message,time); toast(`Message from ${name}`); });
+  socket.on('disconnect',()=>setConnected(false));
+  socket.on('error',({msg})=>toast(msg));
+}
+
+// ── WebRTC ────────────────────────────────────────────────────────────────────
+async function sendOffer(guestId) {
+  const pc = new RTCPeerConnection(ICE); peers[guestId]=pc;
+  if (localStream) localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+  pc.ontrack = e=>{ if(e.streams[0]) setupGuestAudio(guestId,e.streams[0]); };
+  pc.onicecandidate = e=>{ if(e.candidate) socket.emit('ice-candidate',{to:guestId,candidate:e.candidate}); };
+  pc.oniceconnectionstatechange = ()=>updateSignal(guestId,pc.iceConnectionState);
+  const offer = await pc.createOffer({offerToReceiveAudio:true});
+  await pc.setLocalDescription(offer);
+  socket.emit('offer',{code:roomCode,guestId,offer});
+}
+
+function setupGuestAudio(guestId, stream) {
+  if (!audioCtx) audioCtx = new AudioContext();
+  const src = audioCtx.createMediaStreamSource(stream);
+  const gain = audioCtx.createGain(); gain.gain.value=0;
+  src.connect(gain); gain.connect(audioCtx.destination);
+  guestGains[guestId]=gain;
+  const an = audioCtx.createAnalyser(); an.fftSize=128;
+  src.connect(an); guestAnalysers[guestId]=an;
+  drawWaveform(guestId);
+}
+
+function drawWaveform(guestId) {
+  const canvas = document.getElementById(`wave-${guestId}`);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d'); const an = guestAnalysers[guestId];
+  const W=canvas.width, H=canvas.height;
+  const buf = new Uint8Array(an ? an.frequencyBinCount : 32);
+  let phase=0;
+  (function tick(){
+    if (!document.getElementById(`wave-${guestId}`)) return;
+    ctx.clearRect(0,0,W,H);
+    if (an) an.getByteFrequencyData(buf);
+    const bars=28, bw=Math.floor(W/bars)-2;
+    for (let i=0;i<bars;i++){
+      const val = an ? buf[Math.floor(i*buf.length/bars)]/255 : (Math.sin(phase+i*.4)*.15+.15);
+      const h = Math.max(3, val*(H-4));
+      const g=ctx.createLinearGradient(0,H,0,H-h);
+      g.addColorStop(0,'rgba(0,232,122,0.8)');
+      g.addColorStop(.6,'rgba(0,232,122,0.4)');
+      g.addColorStop(1,'rgba(0,232,122,0.1)');
+      ctx.fillStyle=g;
+      ctx.fillRect(i*(bw+2),H-h,bw,h);
+    }
+    phase+=.05;
+    requestAnimationFrame(tick);
+  })();
+}
+
+// ── Cards ─────────────────────────────────────────────────────────────────────
+function avatarColor(name) {
+  let h=0; for(let c of name) h=(h<<5)-h+c.charCodeAt(0);
+  return AVATAR_COLORS[Math.abs(h)%AVATAR_COLORS.length];
+}
+function initials(name) {
+  return name.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
+}
+function timeAgo(ts) {
+  const s=Math.floor((Date.now()-ts)/1000);
+  if(s<60) return 'joined just now';
+  return `joined ${Math.floor(s/60)}m ago`;
+}
+
+function addCard(guest) {
+  guests[guest.id]=guest;
+  const grid=document.getElementById('guest-grid');
+  const empty=grid.querySelector('.empty-state'); if(empty) empty.remove();
+  const card=document.createElement('div');
+  card.className=`guest-card ${guest.status}`;
+  card.id=`card-${guest.id}`;
+  card.innerHTML=cardHTML(guest);
+  grid.appendChild(card);
+  updateGuestCount();
+  // Resize canvas
+  setTimeout(()=>{
+    const cv=document.getElementById(`wave-${guest.id}`);
+    if(cv){cv.width=cv.offsetWidth;cv.height=cv.offsetHeight}
+  },50);
+}
+
+function cardHTML(g) {
+  const color=avatarColor(g.name);
+  return `
+  <div class="card-avatar-row">
+    <div class="avatar" style="background:${color}">
+      <div class="avatar-ring" id="aring-${g.id}"></div>
+      ${initials(g.name)}
+    </div>
+    <div class="card-identity">
+      <div class="card-name">${esc(g.name)}</div>
+      <div class="card-joined" id="joined-${g.id}">${timeAgo(g.joinedAt)}</div>
+    </div>
+    <div class="status-chip chip-${g.status}" id="chip-${g.id}">
+      <div class="chip-dot"></div>${chipLabel(g.status)}
+    </div>
+  </div>
+  <div class="waveform-wrap"><canvas id="wave-${g.id}" width="300" height="40"></canvas></div>
+  <div class="on-air-timer" id="timer-${g.id}">00:00</div>
+  <div class="signal-row">
+    <div class="signal-dots" id="sig-${g.id}">
+      <div class="sig-dot"></div><div class="sig-dot"></div><div class="sig-dot"></div>
+    </div>
+    <span class="signal-label" id="siglbl-${g.id}">Connecting...</span>
+  </div>
+  <div class="ctrl-row">
+    <button class="ctrl-btn cue"    onclick="ctrl('${g.id}','cue')">Cue</button>
+    <button class="ctrl-btn on-air" onclick="ctrl('${g.id}','on-air')">On Air</button>
+    <button class="ctrl-btn hold"   onclick="ctrl('${g.id}','hold')">Hold</button>
+    <button class="ctrl-btn tb" id="tb-${g.id}" onclick="talkback('${g.id}')">Talkback</button>
+    <button class="ctrl-btn rm"     onclick="ctrl('${g.id}','remove')">Remove</button>
+  </div>
+  <div class="tb-label" id="tblbl-${g.id}">TALKBACK ACTIVE</div>`;
+}
+
+function updateCard(guest) {
+  const card=document.getElementById(`card-${guest.id}`); if(!card) return;
+  card.className=`guest-card ${guest.status}`;
+  const chip=document.getElementById(`chip-${guest.id}`);
+  if(chip){chip.className=`status-chip chip-${guest.status}`;chip.innerHTML=`<div class="chip-dot"></div>${chipLabel(guest.status)}`}
+  const timer=document.getElementById(`timer-${guest.id}`);
+  if(timer){
+    if(guest.status==='on-air'){
+      timer.style.display='block';
+      if(!guestTimers[guest.id]) startTimer(guest.id);
+      if(guestGains[guest.id]) guestGains[guest.id].gain.value=1;
+    } else {
+      if(guest.status!=='on-air' && guestGains[guest.id]) guestGains[guest.id].gain.value=0;
+      if(guest.status==='hold'||guest.status==='waiting'){timer.style.display='none';stopTimer(guest.id);}
+    }
+  }
+}
+
+function removeCard(guestId) {
+  const card=document.getElementById(`card-${guestId}`); if(card) card.remove();
+  stopTimer(guestId);
+  if(peers[guestId]){peers[guestId].close();delete peers[guestId];}
+  delete guestGains[guestId]; delete guestAnalysers[guestId];
+  updateGuestCount();
+  if(Object.keys(guests).filter(id=>guests[id]).length===0){
+    document.getElementById('guest-grid').innerHTML=`<div class="empty-state">
+      <div class="empty-ring"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--txt3)" stroke-width="1.5" stroke-linecap="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></div>
+      <h3>Waiting for guests</h3>
+      <div class="big-code">${roomCode}</div>
+      <p>Share the room code or send a WhatsApp invite.</p>
+    </div>`;
+  }
+}
+
+// ── Controls ──────────────────────────────────────────────────────────────────
+function ctrl(guestId, action) {
+  socket.emit('control',{guestId,action});
+  if(action==='remove'){removeCard(guestId);delete guests[guestId];checkOnAir();}
+}
+
+function talkback(guestId) {
+  tbActive[guestId]=!tbActive[guestId];
+  const btn=document.getElementById(`tb-${guestId}`);
+  const lbl=document.getElementById(`tblbl-${guestId}`);
+  btn.classList.toggle('active',tbActive[guestId]);
+  if(lbl) lbl.style.display=tbActive[guestId]?'block':'none';
+  socket.emit('talkback',{guestId,active:tbActive[guestId]});
+}
+
+// ── Timers ────────────────────────────────────────────────────────────────────
+function startTimer(guestId) {
+  let s=0; const el=document.getElementById(`timer-${guestId}`);
+  const iv=setInterval(()=>{
+    s++;
+    if(!document.getElementById(`timer-${guestId}`)){clearInterval(iv);return;}
+    el.textContent=`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+  },1000);
+  guestTimers[guestId]=iv;
+}
+function stopTimer(guestId){if(guestTimers[guestId]){clearInterval(guestTimers[guestId]);delete guestTimers[guestId];}}
+
+// ── Signal ────────────────────────────────────────────────────────────────────
+function updateSignal(guestId, state) {
+  const dots=document.getElementById(`sig-${guestId}`);
+  const lbl=document.getElementById(`siglbl-${guestId}`);
+  if(!dots) return;
+  const all=dots.querySelectorAll('.sig-dot');
+  const map={connected:[3,'lit','Good'],checking:[1,'warn','Checking...'],failed:[0,'bad','Failed'],disconnected:[0,'bad','Lost'],new:[0,'','Connecting...']};
+  const [n,cls,label]=map[state]||[0,'','...'];
+  all.forEach((d,i)=>{d.className='sig-dot';if(i<n)d.classList.add(cls);});
+  if(lbl){lbl.textContent=label;lbl.style.color=cls==='lit'?'var(--green)':cls==='bad'?'var(--red)':'var(--txt3)';}
+}
+
+// ── On Air indicator ──────────────────────────────────────────────────────────
+function checkOnAir() {
+  const on=Object.values(guests).some(g=>g&&g.status==='on-air');
+  document.getElementById('on-air-badge').style.display=on?'flex':'none';
+}
+
+// ── Count ─────────────────────────────────────────────────────────────────────
+function updateGuestCount(){document.getElementById('guest-count').textContent=Object.keys(guests).filter(id=>guests[id]).length;}
+
+// ── Messages ──────────────────────────────────────────────────────────────────
+function addMsg(name,text,time){
+  const list=document.getElementById('msg-list');
+  const empty=list.querySelector('.msg-empty'); if(empty) empty.remove();
+  msgCount++;
+  const badge=document.getElementById('msg-badge');
+  badge.textContent=msgCount; badge.style.display='inline';
+  const item=document.createElement('div'); item.className='msg-item';
+  item.innerHTML=`<div class="msg-from">${esc(name)}</div><div class="msg-text">${esc(text)}</div><div class="msg-time">${new Date(time).toLocaleTimeString('en-GB')}</div>`;
+  list.appendChild(item); list.scrollTop=list.scrollHeight;
+}
+
+// ── Sharing ───────────────────────────────────────────────────────────────────
+function copyCode(){navigator.clipboard.writeText(roomCode).then(()=>toast('Code copied!')).catch(()=>toast(roomCode));}
+function shareWhatsApp(){
+  const url=`${SERVER}/guest?code=${roomCode}`;
+  const msg=`You've been invited to join a live radio session.\n\nJoin here: ${url}\n\nOr open Henolla OnAir and enter code: *${roomCode}*`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+}
+function endSession(){
+  if(!confirm('End this session? All guests will be disconnected.')) return;
+  Object.keys(peers).forEach(id=>peers[id].close());
+  socket.disconnect(); location.reload();
+}
+
+// ── Status bar ────────────────────────────────────────────────────────────────
+function setConnected(on){
+  const dot=document.getElementById('status-dot');
+  dot.style.background=on?'var(--green)':'var(--txt3)';
+  dot.style.boxShadow=on?'0 0 8px var(--green)':'none';
+  document.getElementById('status-txt').textContent=on?`Connected · Room ${roomCode}`:'Disconnected';
+}
+function status(msg){document.getElementById('status-txt').textContent=msg;}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function chipLabel(s){return{waiting:'Waiting',cued:'Cued','on-air':'On Air',hold:'Hold',removed:'Removed'}[s]||s;}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block';
+  clearTimeout(t._t); t._t=setTimeout(()=>t.style.display='none',3200);
+}
+</script>
+</body>
+</html>

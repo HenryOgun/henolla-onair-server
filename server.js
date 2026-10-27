@@ -14,9 +14,9 @@ app.use(cors());
 app.use(express.json());
 
 // Serve studio console
-app.use(express.static(path.join(__dirname, '../studio')));
-// Serve guest app at /guest
-app.use('/guest', express.static(path.join(__dirname, '../app/www')));
+app.use(express.static(path.join(__dirname, 'studio')));
+// Serve guest app at /guest (only available locally — APK loads from assets)
+app.use('/guest', express.static(path.join(__dirname, 'studio')));
 
 const PORT = process.env.PORT || 3400;
 
