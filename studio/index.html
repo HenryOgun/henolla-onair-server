@@ -410,7 +410,13 @@ let peers = {}, guestGains = {}, guestAnalysers = {}, guestTimers = {}, tbActive
 let sessionStart = null, sessionInterval = null, msgCount = 0;
 
 const AVATAR_COLORS = ['#e74c3c','#e67e22','#f39c12','#27ae60','#16a085','#2980b9','#8e44ad','#e91e63','#00bcd4','#ff5722'];
-const ICE = { iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}] };
+const ICE = { iceServers:[
+  {urls:'stun:stun.l.google.com:19302'},
+  {urls:'stun:stun1.l.google.com:19302'},
+  {urls:'turn:openrelay.metered.ca:80',username:'openrelayproject',credential:'openrelayproject'},
+  {urls:'turn:openrelay.metered.ca:443',username:'openrelayproject',credential:'openrelayproject'},
+  {urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'}
+]};
 
 // ── Clock ─────────────────────────────────────────────────────────────────────
 setInterval(() => {
@@ -515,7 +521,7 @@ async function sendOffer(guestId) {
 function setupGuestAudio(guestId, stream) {
   if (!audioCtx) audioCtx = new AudioContext();
   const src = audioCtx.createMediaStreamSource(stream);
-  const gain = audioCtx.createGain(); gain.gain.value=0;
+  const gain = audioCtx.createGain(); gain.gain.value=1;
   src.connect(gain); gain.connect(audioCtx.destination);
   guestGains[guestId]=gain;
   const an = audioCtx.createAnalyser(); an.fftSize=128;
