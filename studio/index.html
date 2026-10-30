@@ -418,6 +418,9 @@ const ICE = { iceServers:[
   {urls:'turn:openrelay.metered.ca:443?transport=tcp',username:'openrelayproject',credential:'openrelayproject'}
 ]};
 
+// ── Unlock AudioContext on first click (Chrome requires user gesture) ──────────
+document.addEventListener('click', ()=>{ if(audioCtx) audioCtx.resume(); }, {once:false});
+
 // ── Clock ─────────────────────────────────────────────────────────────────────
 setInterval(() => {
   document.getElementById('hdr-clock').textContent = new Date().toLocaleTimeString('en-GB');
