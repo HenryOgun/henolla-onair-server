@@ -510,16 +510,19 @@ function connectSocket() {
 async function sendOffer(guestId) {
   const pc = new RTCPeerConnection(ICE); peers[guestId]=pc;
   if (localStream) localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+  // Use addTransceiver to explicitly request incoming audio (more reliable than offerToReceiveAudio)
+  pc.addTransceiver('audio', {direction: 'recvonly'});
   pc.ontrack = e=>{ if(e.streams[0]) setupGuestAudio(guestId,e.streams[0]); };
   pc.onicecandidate = e=>{ if(e.candidate) socket.emit('ice-candidate',{to:guestId,candidate:e.candidate}); };
   pc.oniceconnectionstatechange = ()=>updateSignal(guestId,pc.iceConnectionState);
-  const offer = await pc.createOffer({offerToReceiveAudio:true});
+  const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
   socket.emit('offer',{code:roomCode,guestId,offer});
 }
 
 function setupGuestAudio(guestId, stream) {
   if (!audioCtx) audioCtx = new AudioContext();
+  audioCtx.resume(); // ensure context is running after user gesture
   const src = audioCtx.createMediaStreamSource(stream);
   const gain = audioCtx.createGain(); gain.gain.value=1;
   src.connect(gain); gain.connect(audioCtx.destination);
