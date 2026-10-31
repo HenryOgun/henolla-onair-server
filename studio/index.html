@@ -395,6 +395,7 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   </div>
 </div>
 
+<div id="audio-unblock" style="display:none;position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:200;background:#f4b942;color:#04080f;border:none;border-radius:10px;padding:12px 28px;font-weight:800;font-size:.9rem;font-family:inherit;cursor:pointer;box-shadow:0 4px 20px rgba(244,185,66,.4)" onclick="unblockAudio()">Tap to Enable Audio</div>
 <div class="toast" id="toast"></div>
 <div class="status-bar">
   <div class="status-bar-dot" id="status-dot" style="background:var(--txt3);box-shadow:none"></div>
@@ -486,6 +487,11 @@ async function createRoom() {
       setupAnalyser = audioCtx.createAnalyser(); setupAnalyser.fftSize = 256;
       src.connect(setupAnalyser);
       startSetupMeter();
+      // Warm up Safari audio output: play mic stream muted so later el.play() works without user gesture
+      const warmup = document.createElement('audio');
+      warmup.muted = true; warmup.srcObject = localStream;
+      await warmup.play().catch(()=>{});
+      warmup.pause(); warmup.srcObject = null;
       // Re-enumerate now that permission is granted — labels will appear
       loadDevices();
     } catch(e) {
@@ -548,7 +554,10 @@ function setupGuestAudio(guestId, stream) {
     document.body.appendChild(el);
   }
   el.srcObject = stream;
-  el.play().catch(()=>{});
+  el.play().catch(()=>{
+    // Autoplay blocked — show tap-to-enable button
+    document.getElementById('audio-unblock').style.display='block';
+  });
   // Web Audio analyser for waveform only (not for playback)
   if (!audioCtx) audioCtx = new AudioContext();
   audioCtx.resume();
@@ -557,6 +566,12 @@ function setupGuestAudio(guestId, stream) {
   src.connect(an); guestAnalysers[guestId]=an;
   guestGains[guestId] = el; // store el for removal
   drawWaveform(guestId);
+}
+
+function unblockAudio() {
+  // Play all existing audio elements (called from user gesture)
+  document.querySelectorAll('audio[id^="audio-"]').forEach(el=>el.play().catch(()=>{}));
+  document.getElementById('audio-unblock').style.display='none';
 }
 
 function drawWaveform(guestId) {
