@@ -538,14 +538,24 @@ async function sendOffer(guestId) {
 }
 
 function setupGuestAudio(guestId, stream) {
-  if (!audioCtx) { audioCtx = new AudioContext(); }
+  // Use <audio> element for playback — works reliably in Safari/Chrome without AudioContext quirks
+  let el = document.getElementById(`audio-${guestId}`);
+  if (!el) {
+    el = document.createElement('audio');
+    el.id = `audio-${guestId}`;
+    el.autoplay = true;
+    el.style.display = 'none';
+    document.body.appendChild(el);
+  }
+  el.srcObject = stream;
+  el.play().catch(()=>{});
+  // Web Audio analyser for waveform only (not for playback)
+  if (!audioCtx) audioCtx = new AudioContext();
   audioCtx.resume();
   const src = audioCtx.createMediaStreamSource(stream);
-  const gain = audioCtx.createGain(); gain.gain.value=1;
-  src.connect(gain); gain.connect(audioCtx.destination);
-  guestGains[guestId]=gain;
   const an = audioCtx.createAnalyser(); an.fftSize=128;
   src.connect(an); guestAnalysers[guestId]=an;
+  guestGains[guestId] = el; // store el for removal
   drawWaveform(guestId);
 }
 
@@ -660,6 +670,7 @@ function updateCard(guest) {
 
 function removeCard(guestId) {
   const card=document.getElementById(`card-${guestId}`); if(card) card.remove();
+  const audioEl=document.getElementById(`audio-${guestId}`); if(audioEl) audioEl.remove();
   stopTimer(guestId);
   if(peers[guestId]){peers[guestId].close();delete peers[guestId];}
   delete guestGains[guestId]; delete guestAnalysers[guestId];
