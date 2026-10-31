@@ -529,7 +529,7 @@ async function sendOffer(guestId) {
   const pc = new RTCPeerConnection(ICE); peers[guestId]=pc;
   // Single recvonly transceiver — guest's replaceTrack hits transceivers[0] correctly
   pc.addTransceiver('audio', {direction: 'recvonly'});
-  pc.ontrack = e=>{ if(e.streams[0]) setupGuestAudio(guestId,e.streams[0]); };
+  pc.ontrack = e=>{ const s=(e.streams&&e.streams[0])||new MediaStream([e.track]); setupGuestAudio(guestId,s); };
   pc.onicecandidate = e=>{ if(e.candidate) socket.emit('ice-candidate',{to:guestId,candidate:e.candidate}); };
   pc.oniceconnectionstatechange = ()=>updateSignal(guestId,pc.iceConnectionState);
   const offer = await pc.createOffer();
