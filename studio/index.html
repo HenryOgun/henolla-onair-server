@@ -512,8 +512,7 @@ function connectSocket() {
 // ── WebRTC ────────────────────────────────────────────────────────────────────
 async function sendOffer(guestId) {
   const pc = new RTCPeerConnection(ICE); peers[guestId]=pc;
-  if (localStream) localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
-  // Use addTransceiver to explicitly request incoming audio (more reliable than offerToReceiveAudio)
+  // Single recvonly transceiver — guest's replaceTrack hits transceivers[0] correctly
   pc.addTransceiver('audio', {direction: 'recvonly'});
   pc.ontrack = e=>{ if(e.streams[0]) setupGuestAudio(guestId,e.streams[0]); };
   pc.onicecandidate = e=>{ if(e.candidate) socket.emit('ice-candidate',{to:guestId,candidate:e.candidate}); };
@@ -637,10 +636,9 @@ function updateCard(guest) {
     if(guest.status==='on-air'){
       timer.style.display='block';
       if(!guestTimers[guest.id]) startTimer(guest.id);
-      if(guestGains[guest.id]) guestGains[guest.id].gain.value=1;
     } else {
-      if(guest.status!=='on-air' && guestGains[guest.id]) guestGains[guest.id].gain.value=0;
-      if(guest.status==='hold'||guest.status==='waiting'){timer.style.display='none';stopTimer(guest.id);}
+      timer.style.display='none';
+      stopTimer(guest.id);
     }
   }
 }
