@@ -439,47 +439,62 @@ function startSessionTimer() {
 
 // ── Audio devices ─────────────────────────────────────────────────────────────
 async function loadDevices() {
+  // Enumerate only — no getUserMedia here (Safari blocks getUserMedia without user gesture)
   try {
-    await navigator.mediaDevices.getUserMedia({audio:true});
     const devs = await navigator.mediaDevices.enumerateDevices();
     const sel = document.getElementById('audio-device-select');
     sel.innerHTML = '';
-    devs.filter(d=>d.kind==='audioinput').forEach((d,i)=>{
-      const o = document.createElement('option');
-      o.value = d.deviceId;
-      o.textContent = d.label || `Microphone ${i+1}`;
-      sel.appendChild(o);
-    });
-    sel.onchange = startSetupMeter;
-    startSetupMeter();
-  } catch(e) { status('Mic error: '+e.message); }
+    const inputs = devs.filter(d=>d.kind==='audioinput');
+    if (inputs.length > 0) {
+      inputs.forEach((d,i)=>{
+        const o = document.createElement('option');
+        o.value = d.deviceId;
+        o.textContent = d.label || `Microphone ${i+1}`;
+        sel.appendChild(o);
+      });
+    } else {
+      sel.innerHTML = '<option value="">Default microphone</option>';
+    }
+  } catch(e) { console.warn('Device enum:', e.message); }
 }
 loadDevices();
 
-async function startSetupMeter() {
-  if (localStream) localStream.getTracks().forEach(t=>t.stop());
-  const sel = document.getElementById('audio-device-select');
-  try {
-    localStream = await navigator.mediaDevices.getUserMedia({
-      audio:{ deviceId: sel.value?{exact:sel.value}:undefined, echoCancellation:false, noiseSuppression:false }
-    });
-    if (!audioCtx) audioCtx = new AudioContext();
-    const src = audioCtx.createMediaStreamSource(localStream);
-    setupAnalyser = audioCtx.createAnalyser(); setupAnalyser.fftSize = 256;
-    src.connect(setupAnalyser);
-    const buf = new Uint8Array(setupAnalyser.frequencyBinCount);
-    const bar = document.getElementById('setup-meter');
-    (function tick(){
-      if (!setupAnalyser) return;
-      setupAnalyser.getByteFrequencyData(buf);
-      bar.style.width = Math.min(100, (buf.reduce((a,b)=>a+b,0)/buf.length)*1.8)+'%';
-      requestAnimationFrame(tick);
-    })();
-  } catch(e) { status('Mic error: '+e.message); }
+function startSetupMeter() {
+  if (!setupAnalyser) return;
+  const buf = new Uint8Array(setupAnalyser.frequencyBinCount);
+  const bar = document.getElementById('setup-meter');
+  (function tick(){
+    if (!setupAnalyser) return;
+    setupAnalyser.getByteFrequencyData(buf);
+    bar.style.width = Math.min(100, (buf.reduce((a,b)=>a+b,0)/buf.length)*1.8)+'%';
+    requestAnimationFrame(tick);
+  })();
 }
 
 // ── Create room ───────────────────────────────────────────────────────────────
 async function createRoom() {
+  // Request mic + create AudioContext inside user gesture (required by Safari)
+  if (!audioCtx) {
+    try {
+      const sel = document.getElementById('audio-device-select');
+      localStream = await navigator.mediaDevices.getUserMedia({
+        audio:{ deviceId: sel.value?{exact:sel.value}:undefined, echoCancellation:false, noiseSuppression:false }
+      });
+      audioCtx = new AudioContext();
+      await audioCtx.resume();
+      const src = audioCtx.createMediaStreamSource(localStream);
+      setupAnalyser = audioCtx.createAnalyser(); setupAnalyser.fftSize = 256;
+      src.connect(setupAnalyser);
+      startSetupMeter();
+      // Re-enumerate now that permission is granted — labels will appear
+      loadDevices();
+    } catch(e) {
+      // Mic optional — studio receives guest audio fine without its own mic
+      console.warn('Mic:', e.message);
+      audioCtx = new AudioContext();
+      await audioCtx.resume();
+    }
+  }
   try {
     const r = await fetch(`${SERVER}/api/create-room`,{method:'POST'});
     const d = await r.json(); roomCode = d.code;
@@ -491,7 +506,7 @@ async function createRoom() {
     startSessionTimer();
     connectSocket();
     status('Room '+roomCode+' created — waiting for guests');
-  } catch(e) { toast('Cannot connect to server. Is it running on port 3400?'); }
+  } catch(e) { toast('Cannot reach server — check your connection.'); }
 }
 
 // ── Socket ────────────────────────────────────────────────────────────────────
@@ -523,8 +538,8 @@ async function sendOffer(guestId) {
 }
 
 function setupGuestAudio(guestId, stream) {
-  if (!audioCtx) audioCtx = new AudioContext();
-  audioCtx.resume(); // ensure context is running after user gesture
+  if (!audioCtx) { audioCtx = new AudioContext(); }
+  audioCtx.resume();
   const src = audioCtx.createMediaStreamSource(stream);
   const gain = audioCtx.createGain(); gain.gain.value=1;
   src.connect(gain); gain.connect(audioCtx.destination);
